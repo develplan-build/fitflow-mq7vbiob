@@ -1,0 +1,103 @@
+/* === MODAL === */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+  display: grid; place-items: center; padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+.modal {
+  width: 100%; max-width: 480px;
+  background: linear-gradient(180deg, #14141a, #0d0d11);
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  padding: 24px; animation: slideInUp 0.25s ease;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.modal-head h3 { font-size: 17px; }
+.modal-close { font-size: 20px; color: var(--muted); width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; transition: all 0.15s; }
+.modal-close:hover { background: var(--surface-2); color: var(--text); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 9px; font-size: 14px;
+  transition: all 0.18s;
+}
+.field textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+}
+
+/* === TOAST === */
+.toasts { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 10px; }
+.toast {
+  background: linear-gradient(135deg, #18181d, #101014);
+  border: 1px solid var(--border-strong); border-left-width: 3px;
+  padding: 12px 18px; border-radius: 10px;
+  min-width: 260px; max-width: 380px;
+  font-size: 13px; color: var(--text);
+  animation: slideInUp 0.25s ease;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.toast.success { border-left-color: var(--ok); }
+.toast.error { border-left-color: var(--err); }
+.toast.info { border-left-color: var(--info); }
+
+/* === CALENDAR === */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-head { font-size: 11px; text-transform: uppercase; color: var(--muted); padding: 8px 10px; font-weight: 600; }
+.cal-cell {
+  min-height: 88px; padding: 8px; border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cal-cell:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.cal-cell.muted { opacity: 0.35; }
+.cal-cell.today { border-color: var(--accent); background: rgba(249,115,22,0.08); }
+.cal-cell .day { font-weight: 600; font-size: 13px; }
+.cal-cell .dot { font-size: 10px; color: var(--muted-2); background: rgba(249,115,22,0.12); padding: 2px 6px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* === SHIFTS === */
+.shift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.shift-card { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); transition: all 0.2s; }
+.shift-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.shift-card .who { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.shift-card .role { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.shift-card .time { color: var(--accent-2); font-weight: 600; font-size: 13px; margin-bottom: 10px; }
+
+/* === NOTIFICATIONS === */
+.notif-list { display: flex; flex-direction: column; gap: 8px; }
+.notif {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border);
+  border-left-width: 3px; transition: all 0.15s;
+}
+.notif:hover { background: var(--surface-2); }
+.notif.read { opacity: 0.55; }
+.notif.info { border-left-color: var(--info); }
+.notif.success { border-left-color: var(--ok); }
+.notif.warning { border-left-color: var(--warn); }
+.notif.error { border-left-color: var(--err); }
+.notif .ic { font-size: 18px; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); flex-shrink: 0; }
+.notif .body { flex: 1; }
+.notif .top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.notif .date { font-size: 11px; color: var(--muted); }
+.notif .msg { font-size: 13px; color: var(--muted-2); }
+
+/* === BAR PROGRESS === */
+.bar { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width 0.4s; }
+
+/* === ACTIVITY === */
+.activity-list { display: flex; flex-direction: column; gap: 12px; }
+.activity-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 9px; transition: background 0.15s; }
+.activity-item:hover { background: var(--surface-2); }
+.activity-item .ic { width: 32px; height: 32px; border-radius: 8px; background: rgba(249,115,22,0.12); display: grid; place-items: center; font-size: 14px; flex-shrink: 0; }
+.activity-item .txt { flex: 1; font-size: 13px; }
+.activity-item .txt small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
