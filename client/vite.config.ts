@@ -1,3 +1,4 @@
+```ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -7,6 +8,8 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: false,
+    // Consente richieste da qualsiasi host (necessario per preview su sandbox)
+    allowedHosts: true,
   },
   preview: {
     host: true,
@@ -18,3 +21,4 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
 })
+```
