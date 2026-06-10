@@ -2,12 +2,16 @@ import React from 'react'
 import { useStore } from '../store'
 
 export default function Toasts() {
-  const { toasts } = useStore()
-  if (!toasts.length) return null
+  const { notifications } = useStore()
+  const unread = (notifications || []).filter(n => !n.read).slice(0, 5)
+  if (!unread.length) return null
   return (
     <div className="toast-wrap">
-      {toasts.map(t => (
-        <div key={t.id} className={'toast ' + t.type}>{t.msg}</div>
+      {unread.map(t => (
+        <div key={t.id} className={'toast ' + t.type}>
+          <strong>{t.title}</strong>
+          {t.message && <span> — {t.message}</span>}
+        </div>
       ))}
     </div>
   )
