@@ -1,6 +1,5 @@
 import React from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
-import { StoreProvider } from './store'
+import { Routes, Route } from 'react-router-dom'
 import Toasts from './components/Toasts'
 import Landing from './pages/Landing'
 import AppLayout from './layouts/AppLayout'
@@ -17,7 +16,7 @@ import Reports from './pages/Reports'
 
 export default function App() {
   return (
-    <StoreProvider>
+    <>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/app" element={<AppLayout />}>
@@ -34,6 +33,6 @@ export default function App() {
         </Route>
       </Routes>
       <Toasts />
-    </StoreProvider>
+    </>
   )
 }
