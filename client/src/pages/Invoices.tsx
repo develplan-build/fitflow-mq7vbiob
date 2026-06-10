@@ -1,146 +1,227 @@
 import React, { useState, useMemo } from 'react'
 import { useStore, Invoice } from '../store'
+import { Modal } from '../components/Modal'
 import { API_URL } from '../config'
-import Modal from '../components/Modal'
+
+// Listino piani centralizzato (fix logica prezzi annuali)
+const PLAN_PRICES: Record<string, number> = {
+  'Base': 25,
+  'Pro': 39,
+  'Pro Annuale': 390,
+  'Base Annuale': 250,
+}
+
+function priceFor(plan: string): number {
+  return PLAN_PRICES[plan] ?? 0
+}
 
 export default function Invoices() {
-  const { data, addInvoice, updateInvoice, deleteInvoice, toast } = useStore()
+  const { invoices, setInvoices } = useStore()
   const [open, setOpen] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [form, setForm] = useState<Omit<Invoice, 'id'>>({
-    memberId: '', memberName: '', amount: 25, status: 'pending',
-    date: new Date().toISOString().slice(0, 10), plan: 'Basic mensile'
+  const [editing, setEditing] = useState<Invoice | null>(null)
+  const [form, setForm] = useState<Partial<Invoice>>({
+    memberName: '',
+    plan: 'Base',
+    amount: 25,
+    date: new Date().toISOString().slice(0, 10),
+    status: 'pending',
   })
 
-  const filtered = useMemo(() => data.invoices.filter(i => statusFilter === 'all' || i.status === statusFilter), [data.invoices, statusFilter])
-
-  const totals = useMemo(() => ({
-    paid: data.invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0),
-    pending: data.invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0),
-    overdue: data.invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
-  }), [data.invoices])
+  const totals = useMemo(() => {
+    const paid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+    const pending = invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0)
+    const overdue = invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+    return { paid, pending, overdue, total: paid + pending + overdue }
+  }, [invoices])
 
   function openNew() {
+    setEditing(null)
     setForm({
-      memberId: data.members[0]?.id || '', memberName: data.members[0]?.name || '',
-      amount: 25, status: 'pending', date: new Date().toISOString().slice(0, 10), plan: 'Basic mensile'
+      memberName: '',
+      plan: 'Base',
+      amount: PLAN_PRICES['Base'],
+      date: new Date().toISOString().slice(0, 10),
+      status: 'pending',
     })
     setOpen(true)
   }
-  function pickMember(id: string) {
-    const m = data.members.find(x => x.id === id)
-    if (m) setForm({ ...form, memberId: id, memberName: m.name })
-  }
-  function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.memberId) { alert('Aggiungi prima un cliente'); return }
-    addInvoice(form); setOpen(false)
+
+  function openEdit(inv: Invoice) {
+    setEditing(inv)
+    setForm(inv)
+    setOpen(true)
   }
 
-  async function checkoutSubscription(plan: 'basic' | 'pro') {
+  function onPlanChange(plan: string) {
+    setForm(f => ({ ...f, plan, amount: priceFor(plan) }))
+  }
+
+  function save() {
+    if (!form.memberName || !form.plan) return
+    if (editing) {
+      setInvoices(prev => prev.map(i => (i.id === editing.id ? { ...editing, ...form } as Invoice : i)))
+    } else {
+      const newInv: Invoice = {
+        id: 'i' + Date.now(),
+        memberName: form.memberName!,
+        plan: form.plan!,
+        amount: Number(form.amount) || priceFor(form.plan!),
+        date: form.date || new Date().toISOString().slice(0, 10),
+        status: (form.status as Invoice['status']) || 'pending',
+      }
+      setInvoices(prev => [newInv, ...prev])
+    }
+    setOpen(false)
+  }
+
+  function remove(id: string) {
+    if (!confirm('Eliminare questa fattura?')) return
+    setInvoices(prev => prev.filter(i => i.id !== id))
+  }
+
+  function markPaid(id: string) {
+    setInvoices(prev => prev.map(i => (i.id === id ? { ...i, status: 'paid' } : i)))
+  }
+
+  async function checkout(plan: string) {
     try {
-      const r = await fetch(`${API_URL}/api/checkout`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan })
+      const priceId = plan === 'Pro' ? 'price_pro_monthly' : 'price_base_monthly'
+      const res = await fetch(`${API_URL}/api/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId }),
       })
-      const d = await r.json()
-      if (d.url) { window.location.href = d.url; return }
-      toast(d.error || 'Stripe non configurato', 'error')
-    } catch (e: any) { toast('Errore: ' + e.message, 'error') }
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else alert(data.error || 'Errore checkout')
+    } catch (e: any) {
+      alert('Errore di connessione: ' + e.message)
+    }
   }
 
   return (
-    <div>
-      <div className="page-title">
-        <div><h2>Fatturazione</h2><div className="sub">Fatture e pagamenti ricorrenti</div></div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn-sm ghost" onClick={() => checkoutSubscription('basic')}>Test checkout Basic</button>
-          <button className="btn-sm ghost" onClick={() => checkoutSubscription('pro')}>Test checkout Pro</button>
-          <button className="btn-sm primary" onClick={openNew}>+ Nuova fattura</button>
-        </div>
+    <div className="page">
+      <div className="page-head">
+        <h2>Fatture</h2>
+        <button className="btn-primary" onClick={openNew}>+ Nuova fattura</button>
       </div>
 
-      <div className="kpi-grid">
-        <div className="kpi"><div className="label">Incassato</div><div className="value">€ {totals.paid}</div><span className="trend up">✓ Pagato</span></div>
-        <div className="kpi"><div className="label">In attesa</div><div className="value">€ {totals.pending}</div><span className="trend neutral">— Da incassare</span></div>
-        <div className="kpi"><div className="label">Scaduto</div><div className="value">€ {totals.overdue}</div><span className="trend down">↓ Solleciti</span></div>
-        <div className="kpi"><div className="label">Fatture totali</div><div className="value">{data.invoices.length}</div><span className="trend neutral">— Storico</span></div>
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-label">Incassato</div>
+          <div className="stat-value">€{totals.paid}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">In attesa</div>
+          <div className="stat-value">€{totals.pending}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Scadute</div>
+          <div className="stat-value">€{totals.overdue}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Totale</div>
+          <div className="stat-value">€{totals.total}</div>
+        </div>
       </div>
 
       <div className="card">
-        <div className="filter-bar">
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="all">Tutte</option>
-            <option value="paid">Pagate</option>
-            <option value="pending">In attesa</option>
-            <option value="overdue">Scadute</option>
-          </select>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="empty">
-            <div className="emoji">💳</div>
-            <h4>Nessuna fattura</h4>
-            <p>Crea la prima fattura o configura Stripe per i pagamenti automatici.</p>
-            <button className="btn-sm primary" onClick={openNew}>+ Crea fattura</button>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="tbl">
-              <thead><tr><th>Cliente</th><th>Piano</th><th>Importo</th><th>Data</th><th>Stato</th><th></th></tr></thead>
-              <tbody>
-                {filtered.map(i => (
-                  <tr key={i.id}>
-                    <td><strong>{i.memberName}</strong></td>
-                    <td>{i.plan}</td>
-                    <td>€ {i.amount}</td>
-                    <td>{i.date}</td>
-                    <td><span className={'badge ' + (i.status === 'paid' ? 'ok' : i.status === 'pending' ? 'warn' : 'err')}>{i.status === 'paid' ? 'Pagata' : i.status === 'pending' ? 'In attesa' : 'Scaduta'}</span></td>
-                    <td style={{ textAlign: 'right' }}>
-                      {i.status !== 'paid' && <button className="btn-icon" onClick={() => updateInvoice(i.id, { status: 'paid' })}>Segna pagata</button>}
-                      <button className="btn-icon" onClick={() => { if (confirm('Eliminare fattura?')) deleteInvoice(i.id) }}>Elimina</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Piano</th>
+              <th>Importo</th>
+              <th>Data</th>
+              <th>Stato</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map(i => (
+              <tr key={i.id}>
+                <td>{i.memberName}</td>
+                <td>{i.plan}</td>
+                <td>€{i.amount}</td>
+                <td>{i.date}</td>
+                <td>
+                  <span className={`badge badge-${i.status}`}>{i.status}</span>
+                </td>
+                <td className="row-actions">
+                  {i.status !== 'paid' && (
+                    <button className="btn-link" onClick={() => markPaid(i.id)}>Segna pagata</button>
+                  )}
+                  <button className="btn-link" onClick={() => openEdit(i)}>Modifica</button>
+                  <button className="btn-link danger" onClick={() => remove(i.id)}>Elimina</button>
+                </td>
+              </tr>
+            ))}
+            {invoices.length === 0 && (
+              <tr><td colSpan={6} className="empty">Nessuna fattura</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {open && (
-        <Modal title="Nuova fattura" onClose={() => setOpen(false)}>
-          <form onSubmit={submit}>
-            <div className="field"><label>Cliente</label>
-              <select required value={form.memberId} onChange={e => pickMember(e.target.value)}>
-                <option value="">— Seleziona —</option>
-                {data.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            </div>
-            <div className="field"><label>Piano</label>
-              <select value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value, amount: e.target.value.includes('Pro') ? 39 : 25 })}>
-                <option value="Basic mensile">Basic mensile (25€)</option>
-                <option value="Pro mensile">Pro mensile (39€)</option>
-                <option value="Basic annuale">Basic annuale (250€)</option>
-                <option value="Pro annuale">Pro annuale (390€)</option>
-              </select>
-            </div>
-            <div className="field"><label>Importo (€)</label><input type="number" required value={form.amount} onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) })} /></div>
-            <div className="field"><label>Data</label><input type="date" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
-            <div className="field"><label>Stato</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as any })}>
-                <option value="pending">In attesa</option>
-                <option value="paid">Pagata</option>
-                <option value="overdue">Scaduta</option>
-              </select>
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn-sm ghost" onClick={() => setOpen(false)}>Annulla</button>
-              <button type="submit" className="btn-sm primary">Crea fattura</button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      <div className="card">
+        <h3>Acquista piano (Stripe)</h3>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button className="btn-primary" onClick={() => checkout('Base')}>Base €25/mese</button>
+          <button className="btn-primary" onClick={() => checkout('Pro')}>Pro €39/mese</button>
+        </div>
+      </div>
+
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Modifica fattura' : 'Nuova fattura'}>
+        <div className="form">
+          <label>
+            Cliente
+            <input
+              value={form.memberName || ''}
+              onChange={e => setForm(f => ({ ...f, memberName: e.target.value }))}
+            />
+          </label>
+          <label>
+            Piano
+            <select value={form.plan} onChange={e => onPlanChange(e.target.value)}>
+              <option value="Base">Base (€25/mese)</option>
+              <option value="Pro">Pro (€39/mese)</option>
+              <option value="Base Annuale">Base Annuale (€250)</option>
+              <option value="Pro Annuale">Pro Annuale (€390)</option>
+            </select>
+          </label>
+          <label>
+            Importo (€)
+            <input
+              type="number"
+              value={form.amount ?? 0}
+              onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))}
+            />
+          </label>
+          <label>
+            Data
+            <input
+              type="date"
+              value={form.date || ''}
+              onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+            />
+          </label>
+          <label>
+            Stato
+            <select
+              value={form.status}
+              onChange={e => setForm(f => ({ ...f, status: e.target.value as Invoice['status'] }))}
+            >
+              <option value="pending">In attesa</option>
+              <option value="paid">Pagata</option>
+              <option value="overdue">Scaduta</option>
+            </select>
+          </label>
+          <div className="form-actions">
+            <button className="btn-secondary" onClick={() => setOpen(false)}>Annulla</button>
+            <button className="btn-primary" onClick={save}>Salva</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
